@@ -6,13 +6,17 @@ import com.company.player.Player;
 import com.company.system.DungeonSystem;
 import com.company.system.ItemSystem;
 import com.company.system.PlayerSystem;
+import com.company.threads.FightThread;
 import com.company.threads.Music;
 import com.company.utils.PrintUtil;
+import jdk.swing.interop.SwingInterOpUtils;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class Game {
-    private final DungeonSystem dungeonSystem = new DungeonSystem();
     private final PlayerSystem playerSystem = new PlayerSystem();
     private Music backgroundMusic;
     private Music userCreateMusic;
@@ -20,6 +24,10 @@ public class Game {
     public static Player player;
     public static Monster monster;
     public static Scanner scanner;
+    public static Thread playerDoThread;
+    public static Thread monsterDoThread;
+    public static boolean isFighting = true;
+    public static ExecutorService executorService;
 
     public void play() throws Exception {
         backgroundMusic = new Music("GameIntro.mp3", true); // 배경음악, 무한 반복 재생
@@ -27,7 +35,6 @@ public class Game {
         typingMusic = new Music("Typing.mp3", true); // 타이핑 효과 음악, 무한 반복 재생
 
         scanner = new Scanner(System.in);
-        backgroundMusic.setDaemon(true); // 배경 음악 스레드는 데몬 스레드롲 ㅣ정
         backgroundMusic.start(); // 게임 시작 시 배경 음악 재생
         showGameStartScreen(); // 시작 화면 출력
 
@@ -38,6 +45,7 @@ public class Game {
         System.out.println("[" + playerJob + "] 가 선택되었습니다.\n");
         player = playerSystem.createPlayer(playerName, playerJob); // 플레이어 객체 생성
         Thread.sleep(1000); // 메인 스레드 1초 간 정지 후 실행
+        backgroundMusic.close(); // 배경 음악 종료
         System.out.println("캐릭터를 생성합니다.");
         userCreateMusic.start(); // 유저 생성 음악 재생
         Thread.sleep(1000); // 메인 스레드 1초 간 정지 후 실행
@@ -47,9 +55,9 @@ public class Game {
 
         // # 플레이어 정보 출력 #
         // 플레이어 이름 및 직업 출력
-        playerSystem.showPlayerInfo(player);
+        PlayerSystem.showPlayerInfo(player);
         // 선택한 직업의 능력치 출력
-        playerSystem.showJobDetailInfo(player);
+        PlayerSystem.showJobDetailInfo(player);
         // 유저 생성 음악 종료
         userCreateMusic.close();
         Thread.sleep(2000); // 메인 스레드 2초 간 정지 후 실행
@@ -104,6 +112,8 @@ public class Game {
                 Thread.sleep(25); // 각 문자 별로 25ms 간 정지 후 실행
                 System.out.print(s.charAt(i)); // 문자 하나하나씩 접근하여 출력
             }
+            System.out.println("==================================================\n\n");
+
             Thread.sleep(300); // 메인 스레드 0.3s 간 정지 후 실행
         } catch (Exception e) { // 예외 처리
             e.printStackTrace();
@@ -122,6 +132,8 @@ public class Game {
                 Thread.sleep(25);
                 System.out.print(s.charAt(i));
             }
+            System.out.println("==================================================\n\n");
+
             Thread.sleep(300);
         } catch (Exception e) { // 예외 처리
             e.printStackTrace();
@@ -143,12 +155,14 @@ public class Game {
                 int secondLoopAction = 0;
                 // 마을 루프
                 while(villageRun) {
+                    Music villageWelcomeMusic = new Music("VillageWelcome.mp3", true); // 마을 입장 배경음악 스레드 생성
+                    villageWelcomeMusic.start(); // 마을 입장 시 배경음악 재생
                     // 마을에서 플레이어의 행위 선택
                     secondLoopAction = PlayerSystem.choosePlayerToDoInVillage(scanner);
                     // 사용자의 메뉴 선택에 따라 각각의 로직 진행
                     // 마을 걸어다니기
                     if (secondLoopAction == 1) {
-                        System.out.println("마을 구석구석 이리저리 돌아다니는 중.........");
+                        PrintUtil.printDelay("마을 구석구석 이리저리 돌아다니는 중.........\n\n", 100, true);
                         villageRun = true;
                     }
                     // 회복실로 이동
@@ -164,13 +178,22 @@ public class Game {
                             thirdLoopAction = PlayerSystem.choosePlayerCure(scanner);
                             // 플레이어가 체력 회복 원할 시
                             if (thirdLoopAction == 1) {
-                                PrintUtil.printDelay("휴식중...............", 200, true);
+                                PrintUtil.printDelay("휴식중...............", 100, true);
                                 System.out.println("플레이어의 체력과 마력이 전부 회복되었습니다.\n");
+
+                                // 회복 후 플레이어의 상태 출력
+                                System.out.println("------------ 플레이어 현재 상태 ------------");
+                                System.out.println("체력 : " + player.getHP());
+                                System.out.println("마력 : " + player.getMP());
+                                System.out.println("------------------------------------------\n");
+
                                 // 플레이어의 회복실 탈출 여부 선택
                                 fourthLoopAction = PlayerSystem.stopPlayerCure(scanner);
                                 // 플레이어가 회복실 나가고 싶을 시
                                 if (fourthLoopAction == 1) {
-                                    System.out.println("마을로 이동 중입니다. !!!!!!!!!!!!!!!!!!!!");
+                                    PrintUtil.printDelay("마을로 이동 중입니다...............", 100, true);
+                                    // 로딩 효과 적용
+                                    setLoadingEffect();
                                     // 회복실 루프 종료
                                     cureRun = false;
                                 }
@@ -182,7 +205,9 @@ public class Game {
                             }
                             // 플레이어가 체력 회복 원하지 않을 시
                             else if (thirdLoopAction == 2) {
-                                System.out.println("마을로 이동 중입니다. !!!!!!!!!!!!!!!!!!!!");
+                                PrintUtil.printDelay("마을로 이동 중입니다...............", 100, true);
+                                // 로딩 효과 적용
+                                setLoadingEffect();
                                 // 회복실 루프 종료
                                 cureRun = false;
                                 // 마을 루프 진행
@@ -193,16 +218,18 @@ public class Game {
                     // 여섯 갈래 길로 돌아가기
                     else if (secondLoopAction == 3) {
                         villageRun = false;
+                        PrintUtil.printDelay("여섯 갈래의 길로 이동 중입니다.........", 100, true);
                         // 로딩 효과 적용
                         setLoadingEffect();
                     }
+                    villageWelcomeMusic.close(); // 마을에서 나갈 시 마을 입장 배경음악 종료
                 }
             }
             // 사냥터로 이동
             else if (firstLoopAction == 2) {
                 // 던전 선택 로직 진행 여부
                 boolean dungeonChooseRun = true;
-                int secondLoopAction = 0;
+                String secondLoopAction = null;
                 String dungeonName = null;
                 while(dungeonChooseRun) {
                     // 사용자로부터 4개의 사냥터 중 하나의 값 입력받기
@@ -213,7 +240,7 @@ public class Game {
                     dungeonName = DungeonSystem.getDungeonName(secondLoopAction);
                     // 몬스터와의 전투 진행 여부
                     boolean dungeonRun = true;
-                    int thirdLoopAction = 0;
+                    String thirdLoopAction = null;
                     while(dungeonRun) {
                         // 출몰하는 몬스터 랜덤 생성 및 정보 출력
                         monster = DungeonSystem.makeMonster(dungeonName);
@@ -221,43 +248,64 @@ public class Game {
                         thirdLoopAction = PlayerSystem.chooseFightWithMonster(scanner);
                         // 전투 진행 여부에 대한 입력 값에 따라 분기
                         // 전투 진행하겠다
-                        if (thirdLoopAction == 1) {
+                        if (thirdLoopAction.equals("1")) {
                             System.out.println("플레이어와 몬스터 간 전투를 시작합니다. !!!!!!!");
-                            DungeonSystem.fight(player, monster);
+                            FightThread fightThread = new FightThread(player, monster);
+                            // 배틀 쓰레드 생성
+                            while (isFighting) {
+                                playerDoThread = new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        fightThread.hitMonster();
+                                    }
+                                });
+                                monsterDoThread = new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        fightThread.hitPlayer();
+                                    }
+                                });
+                                // 배틀 시작
+                                playerDoThread.start();
+                                playerDoThread.join();
+                                monsterDoThread.start();
 
+                                if (!isFighting) {
+                                    break;
+                                }
+                            }
                             // 플레이어 공격력 원 상태로 리셋
                             PlayerSystem.resetPlayerAttackPowerBeforeItemUse(player);
-
                             // if (player.isLive()) 플레이어의 승리
                             if (player.isLive()) {
-                                Music achieveMusicThread = new Music("Achieve.mp3", false);
-                                System.out.println(monster.getName() + "가 사망하였습니다.");
                                 Thread.sleep(1000);
+                                System.out.println("\n\n" + monster.getName() + "가 사망하였습니다.");
                                 // 몬스터가 드랍한 아이템 획득 (안 나올 수도 있음.) player.getDropItemFromMonster
                                 Item monsterDropItem = DungeonSystem.dropItem(monster);
-                                System.out.println(monster.getName() + "가 " + monsterDropItem.getName() + "(을/를) 드랍하였습니다.");
-                                Thread.sleep(1000); // 메인 스레드 1초 간 정지
-                                achieveMusicThread.start(); // 획득 효과음 실행
-                                achieveMusicThread.join(); // 획득 효과음 실행 보장
-                                achieveMusicThread = new Music("Achieve.mp3", false);
+                                System.out.println(monster.getName() + "가 " + monsterDropItem.getName() + "(을/를) 드랍하였습니다.\n");
+                                Thread.sleep(1000);
                                 player.getDropItem(monsterDropItem);
+                                Music achieveMusicThread = new Music("Achieve.mp3", false);
+                                achieveMusicThread.setPriority(10);
                                 achieveMusicThread.start(); // 획득 효과음 실행
-                                achieveMusicThread.join(); // 획득 효과음 실행 보장
-                                achieveMusicThread = new Music("Achieve.mp3", false);
+                                achieveMusicThread.join();
                                 System.out.println("플레이어 경험치 +" + monster.getExp());
-                                Thread.sleep(1000); // 메인 스레드 1초 간 정지
+                                achieveMusicThread.close();
+                                achieveMusicThread = new Music("Achieve.mp3", false);
+                                achieveMusicThread.setPriority(10);
                                 achieveMusicThread.start(); // 획득 효과음 실행
                                 achieveMusicThread.join();
                                 System.out.println("플레이어 보유 메소 + " + monster.getDropCoin());
+                                achieveMusicThread.close();
+                                Thread.sleep(500);
                                 // 몬스터가 드랍한 코인 획득 player.getCoinFromMonster
                                 DungeonSystem.giveMonsterDropCoinToPlayer(player, monster);
                                 // 던전 시스템이 플레이어에게 경험치 제공 dungeonSystem.setPlayerExp(monster.exp) { player.setExp(currentExp + monster.exp) }
                                 DungeonSystem.giveMonsterExpToPlayer(player, monster);
                                 // 플레이어의 레벨업 여부 판단
                                 playerSystem.judgeLevelUp(player);
-
                                 // 몬스터 사냥 후의 플레이어 보유 코인 및 경험치 출력
-                                System.out.println("==========================");
+                                System.out.println("\n==========================");
                                 // 플레이어 현재 보유 코인 출력
                                 System.out.println("플레이어의 현재 보유 코인 : " + player.getCoin());
                                 // 플레이어의 현재 경험치 출력
@@ -267,33 +315,34 @@ public class Game {
                                 System.out.println("==========================");
                                 Thread.sleep(1000);
 
-                                int fifthLoopAction = chooseContinueBattle(scanner);
-
-                                // 마을로
-                                if (fifthLoopAction == 2) {
+                                String fourthLoopAction = chooseContinueBattle();
+                                if (fourthLoopAction.equals("2")) {
                                     dungeonRun = false;
                                     dungeonChooseRun = false;
-                                    // 로딩 효고 적용
+                                    PrintUtil.printDelay("여섯 갈래의 길로 이동 중입니다.........", 100, true);
+                                    // 로딩 효과 적용
                                     setLoadingEffect();
                                 }
                             }
                             // if (monster.isLive()) 몬스터의 승리 => 마을에서 소생
                             else if (monster.isLive()) {
-                                System.out.println("플레이어가 사망하였습니다.");
+                                dungeonRun = false;
+                                System.out.println("\n\n플레이어가 사망하였습니다.");
                                 System.out.println("여섯 갈래의 길에서 다시 부활합니다.");
-                                System.out.println("여섯 갈래의 길로 이동 중.........");
+                                PrintUtil.printDelay("여섯 갈래의 길로 이동 중입니다.........", 100, true);
                                 // 로딩 효과 적용
                                 setLoadingEffect();
                             }
                         }
-                        // 전투 진행 안하겠다 => 마을로 이동
-                        else if (thirdLoopAction == 2) {
+                        else if (thirdLoopAction.equals("2")) { // 전투 진행 안하겠다 => 마을로 이동
                             dungeonRun = false;
                             dungeonChooseRun = false;
-                            System.out.println("여섯 갈래의 길로 이동 중입니다. !!!!!!!!!!!!!!!!!!!!");
+                            PrintUtil.printDelay("여섯 갈래의 길로 이동 중입니다.........\n", 100, true);
                             // 로딩 효과 적용
                             setLoadingEffect();
                         }
+                        monster = null; // 몬스터 사냥 후 값 제거해주기
+                        isFighting = true; // flag 변수는 다시 true 값으로
                     }
                 }
             }
@@ -302,39 +351,60 @@ public class Game {
                 Thread.sleep(1000); // 스레드 1초 간 정지
                 DungeonSystem.appearBossMonster(); // 보스 몹 ASCII 코드로 등장
                 monster = DungeonSystem.makeBossMonster(); // 보스 몬스터 생성
-                int thirdLoopAction = 0;
-                // 몬스터와 전투 여부 입력받기
-                thirdLoopAction = PlayerSystem.chooseFightWithMonster(scanner);
-                // 전투 진행 여부에 대한 입력 값에 따라 분기
-                // 전투 진행하겠다
-                if (thirdLoopAction == 1) {
-                    System.out.println("플레이어와 몬스터 간 전투를 시작합니다. !!!!!!!");
-                    DungeonSystem.fight(player, monster);
 
+                String fightOrNot = PlayerSystem.chooseFightWithMonster(scanner);
+                FightThread fightThread = new FightThread(player, monster);
+
+                if (fightOrNot.equals("1")) {
+                    Thread.sleep(1000);
+                    // 배틀 쓰레드 생성
+                    while (isFighting) {
+                        playerDoThread = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                fightThread.hitMonster();
+                            }
+                        });
+                        monsterDoThread = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                fightThread.hitPlayer();
+                            }
+                        });
+                        // 배틀 시작
+                        playerDoThread.start();
+                        monsterDoThread.start();
+
+                        if (!isFighting) break;
+                    }
                     // 플레이어 공격력 원 상태로 리셋
                     PlayerSystem.resetPlayerAttackPowerBeforeItemUse(player);
+
+                    if (!isFighting) {
+                        playerDoThread.interrupt();
+                        monsterDoThread.interrupt();
+                    }
 
                     // if (player.isLive()) 플레이어의 승리
                     if (player.isLive()) {
                         Music achieveMusicThread = new Music("Achieve.mp3", false);
-                        System.out.println(monster.getName() + "가 사망하였습니다.");
+                        System.out.println("\n" + monster.getName() + "가 사망하였습니다.");
                         Thread.sleep(1000);
                         // 몬스터가 드랍한 아이템 획득 (안 나올 수도 있음.) player.getDropItemFromMonster
                         Item monsterDropItem = DungeonSystem.dropItem(monster);
-                        System.out.println(monster.getName() + "가 " + monsterDropItem.getName() + "(을/를) 드랍하였습니다.");
-                        Thread.sleep(1000); // 메인 스레드 1초 간 정지
+                        System.out.println(monster.getName() + "가 " + monsterDropItem.getName() + "(을/를) 드랍하였습니다.\n");
                         achieveMusicThread.start(); // 획득 효과음 실행
-                        achieveMusicThread.join();
+                        achieveMusicThread.join(); // 획득 효과음 실행 보장
                         achieveMusicThread = new Music("Achieve.mp3", false);
                         player.getDropItem(monsterDropItem);
                         achieveMusicThread.start(); // 획득 효과음 실행
-                        achieveMusicThread.join();
+                        achieveMusicThread.join(); // 획득 효과음 실행 보장
                         achieveMusicThread = new Music("Achieve.mp3", false);
                         System.out.println("플레이어 경험치 +" + monster.getExp());
-                        Thread.sleep(1000); // 메인 스레드 1초 간 정지
                         achieveMusicThread.start(); // 획득 효과음 실행
                         achieveMusicThread.join();
                         System.out.println("플레이어 보유 메소 + " + monster.getDropCoin());
+
                         // 몬스터가 드랍한 코인 획득 player.getCoinFromMonster
                         DungeonSystem.giveMonsterDropCoinToPlayer(player, monster);
                         // 던전 시스템이 플레이어에게 경험치 제공 dungeonSystem.setPlayerExp(monster.exp) { player.setExp(currentExp + monster.exp) }
@@ -343,36 +413,30 @@ public class Game {
                         playerSystem.judgeLevelUp(player);
 
                         // 몬스터 사냥 후의 플레이어 보유 코인 및 경험치 출력
-                        System.out.println("==========================");
+                        System.out.println("====================================================");
                         // 플레이어 현재 보유 코인 출력
                         System.out.println("플레이어의 현재 보유 코인 : " + player.getCoin());
                         // 플레이어의 현재 경험치 출력
                         playerSystem.showPlayerExp(player);
                         // 플레이어의 레벨 업까지 남은 경험치 출력
                         playerSystem.showLeftExpForLevelUp(player);
-                        System.out.println("==========================");
+                        System.out.println("====================================================");
                         Thread.sleep(1000);
 
-                        int fifthLoopAction = chooseContinueBattle(scanner);
-
-                        // 마을로
-                        if (fifthLoopAction == 2) {
-                            // 로딩 효과 적용
-                            setLoadingEffect();
-                        }
+                        System.out.println("게임 종료");
+                        System.exit(1);
                     }
-                    // if (monster.isLive()) 몬스터의 승리 => 여섯 갈래의 길에서 소생
+                    // if (monster.isLive()) 몬스터의 승리 => 마을에서 소생
                     else if (monster.isLive()) {
-                        System.out.println("플레이어가 사망하였습니다.");
-                        System.out.println("여섯 갈래의 길에서 다시 시작합니다.");
-                        System.out.println("여섯 갈래의 길로 이동 중.........");
+                        System.out.println("\n\n플레이어가 사망하였습니다.");
+                        System.out.println("여섯 갈래의 길에서 다시 부활합니다.");
+                        PrintUtil.printDelay("여섯 갈래의 길로 이동 중입니다.........", 100, true);
                         // 로딩 효과 적용
                         setLoadingEffect();
                     }
-                }
-                // 전투 진행 안하겠다 => 마을로 이동
-                else if (thirdLoopAction == 2) {
-                    System.out.println("어섯 갈래의 길로 이동 중입니다. !!!!!!!!!!!!!!!!!!!!");
+                    monster = null; // 몬스터 사냥 후 값 제거해주기
+                } else if (fightOrNot.equals("2")) {
+                    PrintUtil.printDelay("여섯 갈래의 길로 이동 중입니다.........", 100, true);
                     // 로딩 효과 적용
                     setLoadingEffect();
                 }
@@ -502,7 +566,7 @@ public class Game {
         // 메뉴 선택
         int action = 0;
 
-        System.out.println("현재 여섯 갈래 길에 위치하고 있습니다.");
+        System.out.println("현재 여섯 갈래 길에 위치하고 있습니다.\n");
         System.out.println("가고 싶은 장소를 선택해주세요.");
         System.out.println("1. 마을로 이동(체력 회복)");
         System.out.println("2. 사냥터로 이동");
@@ -524,7 +588,9 @@ public class Game {
 
     // 회복실 입장 메세지 출력
     public static void printEnterHospitalMessage() {
-        System.out.println("회복실로 이동 중입니다. !!!!!!!!!!!!!!!!!!!!");
+        try {
+            PrintUtil.printDelay("회복실로 이동 중입니다...............", 200, true);
+        } catch (Exception ignored) {}
         System.out.println("회복실로 들어오셨습니다.");
     }
 
@@ -587,14 +653,15 @@ public class Game {
         }
     }
     // 사용자의 선택 (전투 계속 할 지 안 할 지)
-    public int chooseContinueBattle(Scanner scanner) {
-        int action = 0;
-        System.out.println("사냥을 계속 하시겠습니까?");
+    public String chooseContinueBattle() {
+        Scanner scanner = new Scanner(System.in);
+        String action = null;
+        System.out.println("\n사냥을 계속 하시겠습니까?");
         System.out.println("1. 예 2. 아니오");
-        action = Integer.parseInt(scanner.nextLine());;
-        if (!((action == 1) || (action == 2))) {
+        action = scanner.nextLine();
+        if (!((action.equals("1")) || (action.equals("2")))) {
             System.out.println("잘못된 선택입니다. 1, 2 번 중 선택해주세요.");
-            action = chooseContinueBattle(scanner);
+            action = chooseContinueBattle();
         }
         return action;
     }
@@ -636,7 +703,7 @@ public class Game {
     }
     // 로딩바 적용
     public static void setLoadingEffect() throws InterruptedException {
-        String loadingBar ="██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n";
+        String loadingBar ="██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n\n\n";
 
         for (int i = 0; i < loadingBar.length(); i++) { // 로딩 효과 스레드
             Thread.sleep(10);

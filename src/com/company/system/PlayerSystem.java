@@ -22,13 +22,11 @@ public class PlayerSystem {
         // 플레이어 현재 레벨
         int currentLevel = player.getLevel();
         // 레벨 별 요구 경험치
-        requiredExpForLevel = rule.giveRequiredExpForLevel(currentLevel);
+        requiredExpForLevel = Rule.giveRequiredExpForLevel(currentLevel);
         leftExpForLevelUp = requiredExpForLevel - player.getCurrentExp();
-        System.out.println("레벨 업까지 남은 경험치 : " + leftExpForLevelUp);
-
         // 플레이어의 현재 경험치가 레벨 별 요구 경험치보다 크거나 같다면,
         if (player.getCurrentExp() >= requiredExpForLevel) {
-            System.out.println("플레이어 레벨 업!!!!!!");
+            System.out.println("\n플레이어 레벨 업!!!!!!");
             // 레벨 증가
             player.setLevel(currentLevel + 1);
             // 플레이어 스탯 증가
@@ -51,6 +49,7 @@ public class PlayerSystem {
         System.out.println("이름 : " + player.getName());
         System.out.println("레벨 : " + player.getLevel());
         System.out.println("직업 : " + player.getJob());
+        System.out.println("====================================================\n");
     }
     // 플레이어 선택 직업 및 능력치 출력
     public static void showJobDetailInfo(Player player) {
@@ -60,11 +59,19 @@ public class PlayerSystem {
         System.out.println("마력 : " + player.getMP());
         System.out.println("공격력 : " + player.getAttackPower());
         System.out.println("방어력 : " + player.getShieldPower());
-        System.out.println("====================================================");
+        System.out.println("====================================================\n");
     }
     // 레벨 업까지 남은 경험치 출력
     public void showLeftExpForLevelUp(Player player) {
-        leftExpForLevelUp = (requiredExpForLevel == player.getCurrentExp()) ? 0 : requiredExpForLevel - player.getCurrentExp();
+        requiredExpForLevel = Rule.giveRequiredExpForLevel(player.getLevel());
+
+        if (player.getCurrentExp() > requiredExpForLevel) {
+            leftExpForLevelUp = player.getCurrentExp() - requiredExpForLevel;
+        } else if (player.getCurrentExp() == requiredExpForLevel) {
+            leftExpForLevelUp = 0;
+        } else {
+            leftExpForLevelUp = requiredExpForLevel - player.getCurrentExp();
+        }
         System.out.println("레벨 업까지 남은 경험치 : " + leftExpForLevelUp);
     }
 
@@ -85,8 +92,12 @@ public class PlayerSystem {
         String userName;
         while(true) {
             System.out.print("사용자 이름을 입력해주세요 : ");
+
             userName = scanner.nextLine();
 
+            if (userName == null || userName.equals("")) {
+                userName = setName(scanner);
+            }
             // 한글 이외의 문자 입력 시 에러 처리
             if (userName.matches("^[ㄱ-ㅎ가-힣]*$")) break;
             System.out.println("사용자 이름이 올바르지 않습니다. 반드시 한글만으로 입력해주시기 바랍니다.");
@@ -99,7 +110,7 @@ public class PlayerSystem {
         while(true) {
             System.out.println("사용자의 직업을 선택해주세요.(정수만 입력) ");
             System.out.println("1. 전사 2. 마법사");
-            jobOption = Integer.parseInt(scanner.nextLine());;
+            jobOption = Integer.parseInt(scanner.nextLine());
 
             // 주어진 메뉴 이외의 숫자 입력 시 에러 처리
             if (jobOption == 1 || jobOption == 2) {
@@ -208,9 +219,8 @@ public class PlayerSystem {
         return action;
     }
     // 플레이어의 던전 선택
-    public static int chooseDungeon(Scanner scanner) {
-        int action = 0;
-        System.out.println("사냥터로 이동 중입니다. !!!!!!!!!!!!!!!!!!!!");
+    public static String chooseDungeon(Scanner scanner) {
+        String action = null;
         System.out.println("원하시는 사냥터를 선택해주세요!");
         System.out.println("===================== 사냥터 =====================");
         System.out.println("1. 초심자의 사냥터1");
@@ -218,20 +228,20 @@ public class PlayerSystem {
         System.out.println("3. 중급자의 사냥터1");
         System.out.println("4. 중급자의 사냥터2");
         // 사냥터 선택
-        action = Integer.parseInt(scanner.nextLine());
-        if (!((action == 1) || (action == 2) || (action == 3) || (action == 4))) {
+        action = scanner.nextLine();
+        if (!((action.equals("1")) || (action.equals("2")) || (action.equals("3")) || (action.equals("4")))) {
             System.out.println("잘못된 선택입니다. 1, 2, 3, 4 번 중 선택해주세요.");
             action = chooseDungeon(scanner);
         }
         return action;
     }
     // 몬스터와의 전투 여부 입력 받기
-    public static int chooseFightWithMonster(Scanner scanner) {
-        int action = 0;
+    public static String chooseFightWithMonster(Scanner scanner) {
+        String action = null;
         System.out.println("\n싸우시겠습니까?");
         System.out.println("1. 네 2. 아니오");
-        action = Integer.parseInt(scanner.nextLine());
-        if (!((action == 1) || (action == 2))) {
+        action = scanner.nextLine();
+        if (!((action.equals("1")) || (action.equals("2")))) {
             System.out.println("잘못된 선택입니다. 1, 2 번 중 선택해주세요.");
             action = chooseFightWithMonster(scanner);
         }

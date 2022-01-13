@@ -1,24 +1,20 @@
 package com.company.system;
 
-import com.company.Game;
 import com.company.item.Item;
 import com.company.monster.BossMonster;
 import com.company.monster.GeneralMonster;
 import com.company.monster.Monster;
 import com.company.player.Player;
-import com.company.threads.AttackPlayer;
 import com.company.threads.Music;
 import com.company.types.MonsterTypes;
 
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Random;
-import java.util.Scanner;
 
 public class DungeonSystem {
     private static final Random rand = new Random();
     private static Monster monster;
-    private static final Scanner scanner = new Scanner(System.in);
 
     // 몬스터 객체화 담당 메소드
     public static Monster createMonster(String monsterName) throws IllegalAccessException {
@@ -133,25 +129,26 @@ public class DungeonSystem {
         player.setCoin(player.getCoin() + monster.getDropCoin());
     }
     // 입력값에 따라 던전 이름 출력
-    public static String getDungeonName(int action) {
+    public static String getDungeonName(String action) {
         // 초록 달팽이, 파란 달팽이, 빨간 달팽이 랜덤하게 출몰
-        if (action == 1) { return "BEGINNER_DUNGEON_1"; }
+        if (action.equals("1")) { return "BEGINNER_DUNGEON_1"; }
         // 돼지, 슬라임, 스텀프, 리본 돼지, 주황 버섯 랜덤하게 출몰
-        else if (action == 2) { return "BEGINNER_DUNGEON_2"; }
+        else if (action.equals("2")) { return "BEGINNER_DUNGEON_2"; }
         // 시니컬한 주황버섯, 이상한 돼지, 초록버섯, 뿔버섯, 레이스 랜덤하게 출몰
-        else if (action == 3) { return "INTERMEDIATE_DUNGEON_1"; }
+        else if (action.equals("3")) { return "INTERMEDIATE_DUNGEON_1"; }
         // 파란버섯, 좀비버섯, 이블아이, 와일드보어 랜덤하게 출몰
-        else if (action == 4) { return "INTERMEDIATE_DUNGEON_2"; }
+        else if (action.equals("4")) { return "INTERMEDIATE_DUNGEON_2"; }
         return null;
     }
     // 일반 몬스터 생성
     public static Monster makeMonster(String dungeonName) throws IllegalAccessException {
         Monster monster = createRandomMonster(dungeonName);
         System.out.println(monster.getName() + "가 출몰하였습니다!!!");
-        System.out.println("===== 출몰한 몬스터의 정보 =====");
+        System.out.println("\n===== 출몰한 몬스터의 정보 =====");
         System.out.println("몬스터 이름 : " + monster.getName());
         System.out.println("몬스터 체력 : " + monster.getHP());
         System.out.println("몬스터 공격력 : " + monster.getAttackPower());
+        System.out.println("===============================");
         return monster;
     }
     // 몬스터가 가지고 있는 아이템 중 랜덤으로 1개 드랍
@@ -164,7 +161,7 @@ public class DungeonSystem {
     // 보스 몬스터 생성
     private static BossMonster createBossMonster() {
         ArrayList<Item> dropItemList = ItemSystem.createMonsterDropItemList(MonsterTypes.MUSHMOM.name());
-        return new BossMonster("머쉬맘", 17500, 0, 126, 320, 1650, dropItemList, 1000);
+        return new BossMonster("머쉬맘", 3000, 0, 100, 200, 1650, dropItemList, 1000);
     }
     // 보스 몬스터 정보 출력
     public static BossMonster makeBossMonster() {
@@ -228,47 +225,6 @@ public class DungeonSystem {
             bossMonsterBGM.join();
         } catch(Exception e) { // 예외 처리
             e.printStackTrace();
-        }
-    }
-    public static void fight(Player player, Monster monster) throws Exception {
-        int fourthLoopAction;
-        // 플레이어와 몬스터 간 전투
-
-        // 몬스터 혹은 플레이어 모두 살아 있다면 전투 진행
-        while((player.isLive()) && (monster.isLive())) {
-            Music attackMusic = new Music("Attack.mp3", false); // 공격 효과음 재생 쓰레드 생성
-            AttackPlayer attackPlayer = new AttackPlayer(); // 몬스터의 플레이어 자동 공격 스레드 생성
-            attackPlayer.start(); // // 몬스터의 플레이어 자동 공격 스레드 실행
-            fourthLoopAction = PlayerSystem.choosePlayerDoInBattle(scanner); // 전투 중 플레이어의 행위 입력받기
-            // 플레이어의 기본 공격
-            if (fourthLoopAction == 1) {
-                attackMusic.start(); // 공격 효과음 스레드의 run 메소드 호출 >> 공격 효과음 재생
-                attackMusic.join(); // 공격 효과음 스레드의 호출 보장
-                player.attack(monster); // 플레이어가 몬스터에게 공격
-            }
-            // 플레이어의 공격스킬 사용
-            else if (fourthLoopAction == 2) {
-                player.useAttackSkill(monster);
-            }
-            // 플레이어의 버프스킬 사용
-            else if (fourthLoopAction == 3) {
-                player.useBuffSkill();
-            }
-            // 플레이어의 아이템 사용
-            else if (fourthLoopAction == 4) {
-                PlayerSystem.printPlayerInventory(player); // 플레이어의 현재 보유 아이템 목록 출력
-                String useItemInput = Game.getUseItemInput(scanner); // 사용할 아이템 이름을 입력해주세요.
-                if (useItemInput != null) System.out.println("아이템 이름 : " + useItemInput);
-                player.useItem(useItemInput); // 사용자의 입력값과 일치하는 아이템 사용
-                continue;
-            }
-            // 플레이어 여섯 갈래의 길로 돌아가기
-            else if (fourthLoopAction == 5) {
-                return;
-            }
-            attackPlayer.close(); // 플레이어로부터 입력을 받고 나면 몬스터의 자동 공격 종료
-
-            System.out.println(monster.getName() + "의 남은 HP : " + monster.getHP());
         }
     }
 }

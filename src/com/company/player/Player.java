@@ -5,6 +5,7 @@ import com.company.item.Item;
 import com.company.item.OrderSheet;
 import com.company.item.Potion;
 import com.company.monster.Monster;
+import com.company.threads.Music;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -114,6 +115,7 @@ public class Player extends Character {
     public void increaseBuffSkillLevel() { return; } // (전사, 마법사 공통) 버프 스킬 레벨 업
 
     public void getDropItem(Item item) {
+        Music achieveMusicThread = new Music("Achieve.mp3", false);
         // 인벤토리에 드랍한 아이템 추가
         row:
         for(int i=0; i<inventory.size(); i++) {
@@ -126,6 +128,10 @@ public class Player extends Character {
                 }
             }
         }
+        achieveMusicThread.start(); // 획득 효과음 실행
+        try {
+            achieveMusicThread.join(); // 획득 효과음 실행 보장
+        } catch (Exception e) { }
         System.out.println("플레이어 " + item.getName() + " 획득!!!");
     }
 
@@ -134,22 +140,38 @@ public class Player extends Character {
     }
 
     public void useAttackSkill(Monster monster) {
-        if (this.getJob() == "전사") {
+        if (this.getJob().equals("전사")) {
+            Music attackSkillMusic = new Music("WarriorSkill.mp3", false);
+            attackSkillMusic.start(); // 공격 효과음 적용
+
+            try {
+                attackSkillMusic.join(); // 공격 효과음 실행 보장
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             // 전사 공격 스킬 사용
             this.powerStrike(monster);
         }
-        else if (this.getJob() == "마법사") {
+        else if (this.getJob().equals("마법사")) {
+            Music attackSkillMusic = new Music("MagicianSkill.mp3", false);
+            attackSkillMusic.start(); // 공격 효과음 적용
+
+            try {
+                attackSkillMusic.join(); // 공격 효과음 실행 보장
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             // 마법 사 공격 스킬 사용
             this.energyBolt(monster);
         }
     }
 
     public void useBuffSkill() {
-        if (this.getJob() == "전사") {
+        if (this.getJob().equals("전사")) {
             // 전사 버프 스킬 사용
             this.ironBody();
         }
-        else if (this.getJob() == "마법사") {
+        else if (this.getJob().equals("마법사")) {
             // 마법사 버프 스킬 사용
             this.heal();
         }

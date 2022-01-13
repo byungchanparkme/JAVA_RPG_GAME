@@ -34,9 +34,11 @@ public class Music extends Thread {
         try {
             do {
                 player.play(); // 곡 재생
-                fis = new FileInputStream(file);
-                bis = new BufferedInputStream(fis);
-                player = new Player(bis);
+                if (isLoop) {
+                    fis = new FileInputStream(file);
+                    bis = new BufferedInputStream(fis);
+                    player = new Player(bis);
+                }
             } while(isLoop); // isLoop 가 true 이면 무한반복
         } catch (Exception e) { // 오류 발생 시
             e.printStackTrace();
